@@ -1,0 +1,17 @@
+[
+  {
+    "usuarioOid": "32a7ca6e-5a16-4dd0-9cc5-7ad24350eca3",
+    "items": [
+      {
+        "nombre": "Teclado mecánico gamer RedBack",
+        "precio": 79990.0,
+        "cantidad": 1
+      },
+      {
+        "nombre": "Alfombrilla XL Pro",
+        "precio": 29990.0,
+        "cantidad": 2
+      }
+    ]
+  }
+]
