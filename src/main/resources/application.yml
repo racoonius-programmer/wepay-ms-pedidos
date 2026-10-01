@@ -15,3 +15,8 @@ spring:
   h2:
     console:
       enabled: true
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: 5672
+    username: ${RABBIT_USER:admin}
+    password: ${RABBIT_PASS:admin}

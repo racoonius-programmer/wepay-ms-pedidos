@@ -7,19 +7,24 @@ import cl.duoc.ms_pedidos.entity.DetallePedido;
 import cl.duoc.ms_pedidos.entity.EstadoPedido;
 import cl.duoc.ms_pedidos.entity.Pedido;
 import cl.duoc.ms_pedidos.repository.PedidoRepository;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class PedidoService {
 
     private final PedidoRepository pedidoRepository;
+    private final RabbitTemplate rabbitTemplate;
 
-    public PedidoService(PedidoRepository pedidoRepository) {
+    public PedidoService(PedidoRepository pedidoRepository, RabbitTemplate rabbitTemplate) {
         this.pedidoRepository = pedidoRepository;
+        this.rabbitTemplate = rabbitTemplate;
     }
 
     @Transactional
@@ -33,7 +38,6 @@ public class PedidoService {
         double totalCalculado = 0.0;
 
         for (ItemCarritoRequest item : request.items()) {
-            // Se asume que actualizaste ItemCarritoRequest para incluir productoId()
             DetallePedido detalle = new DetallePedido(
                     item.productoId(), 
                     item.nombre(), 
@@ -69,8 +73,22 @@ public class PedidoService {
         pedido.setEstado(nuevoEstado);
         Pedido actualizado = pedidoRepository.save(pedido);
         
+        // --- Integración con RabbitMQ para Notificaciones ---
+        // Emitimos el comando solo si el estado es diferente al inicial
+        if (nuevoEstado != EstadoPedido.CREADO) {
+            Map<String, Object> mensajeEmail = new HashMap<>();
+            // Simulamos el correo usando el OID del usuario
+            mensajeEmail.put("to", "cliente_" + actualizado.getUsuarioOid() + "@wepay.cl");
+            mensajeEmail.put("subject", "Actualización de Pedido #" + actualizado.getId());
+            mensajeEmail.put("body", "Tu pedido ha cambiado al estado: " + nuevoEstado.name());
+
+            // Enviamos al exchange "cmd.direct" con el routing key "email.send"
+            rabbitTemplate.convertAndSend("cmd.direct", "email.send", mensajeEmail);
+        }
+        // ----------------------------------------------------
+
         // TODO: (Próximamente) Si el estado es ACEPTADO, llamar a ms-catalogo para descontar stock
-        // TODO: (Próximamente) Publicar evento en Kafka y enviar comando a RabbitMQ para notificar al cliente
+        // TODO: (Próximamente) Publicar evento de cambio de estado en Kafka
         
         return convertirADto(actualizado);
     }
@@ -93,7 +111,7 @@ public class PedidoService {
                 p.getUsuarioOid(),
                 p.getTotal(),
                 p.getFechaRegistro(),
-                p.getEstado().name() // Convertimos el Enum a String para la respuesta JSON
+                p.getEstado().name() 
         );
     }
 }
